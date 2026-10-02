@@ -3,24 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Succombe – Commander le plat du jour</title>
-<meta name="description" content="Le plat du jour Succombe, avec ses valeurs nutritionnelles, livré chez vous.">
+<title>Succombe – Plats et gâteaux livrés</title>
+<meta name="description" content="Les plats et gâteaux Succombe, avec leurs valeurs nutritionnelles, livrés chez vous.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#A8344E">
+<meta name="theme-color" content="#241A12">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div><div class="brand">Succombe</div><div class="tag">Le plat du jour, livré chez vous.</div></div>
+    <div><div class="brand">Succombe</div><div class="tag">Plats et gâteaux, livrés chez vous</div></div>
   </header>
   <main>
     <h2 id="dayTitle">La carte</h2>
     <div class="days" id="days" role="group" aria-label="Choisir le jour"></div>
+    <div class="ctabs" id="ctabs" role="group" aria-label="Type de produit">
+      <button type="button" data-t="plat" aria-pressed="true">Plats<span id="nPlat"></span></button>
+      <button type="button" data-t="gateau" aria-pressed="false">Gâteaux<span id="nGateau"></span></button>
+    </div>
     <div id="plats"><p class="muted">Chargement de la carte…</p></div>
     <section id="mineWrap"><h2>Mes commandes</h2><div id="mine"></div></section>
   </main>
@@ -47,6 +51,7 @@
       <div><label for="f-ville">Ville *</label><input id="f-ville" name="ville" autocomplete="address-level2" required></div>
       <div class="full"><label for="f-creneau">Créneau de livraison</label><select id="f-creneau" name="creneau"></select></div>
       <div class="full"><label for="f-note">Instructions (digicode, étage, allergies…)</label><textarea id="f-note" name="note"></textarea></div>
+      <div class="full"><label class="check" for="f-optin"><input type="checkbox" id="f-optin" name="optin"><span>J'accepte que Succombe m'envoie un e-mail pour me proposer ses pâtisseries des fêtes de fin d'année. Mon e-mail ne sert qu'à cela et je peux retirer mon accord à tout moment.</span></label></div>
     </div>
     <div class="err" id="orderErr"></div>
     <div class="row">

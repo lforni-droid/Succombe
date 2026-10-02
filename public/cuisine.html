@@ -6,20 +6,36 @@
 <meta name="robots" content="noindex">
 <title>Succombe – Cuisine</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#A8344E">
+<meta name="theme-color" content="#241A12">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div><div class="brand">Succombe</div><div class="tag">Espace cuisine : commandes et carte du jour.</div></div>
+    <div><div class="brand">Succombe</div><div class="tag">Espace cuisine</div></div>
     <div class="toplinks"><button class="btn ghost sm" id="logout" type="button" hidden>Se déconnecter</button></div>
   </header>
   <main id="view"><p class="muted" style="margin-top:28px">Chargement…</p></main>
 </div>
+<dialog id="prodDlg">
+  <form class="dlg" id="prodForm" novalidate>
+    <h2 id="pfTitle">Nouveau plat</h2>
+    <div class="grid">
+      <div class="full"><label for="p-nom">Nom *</label><input id="p-nom" required maxlength="120"></div>
+      <div class="full"><label for="p-desc">Description</label><textarea id="p-desc" maxlength="600"></textarea></div>
+      <div><label for="p-prot">Protéines (g)</label><input id="p-prot" inputmode="decimal"></div>
+      <div><label for="p-lip">Lipides (g)</label><input id="p-lip" inputmode="decimal"></div>
+      <div><label for="p-gluc">Glucides (g)</label><input id="p-gluc" inputmode="decimal"></div>
+      <div><label for="p-kcal">Calories (kcal)</label><input id="p-kcal" inputmode="decimal"><button type="button" class="linkbtn" id="calc" style="margin-top:4px">Calculer depuis les macros</button></div>
+      <div><label for="p-prix">Prix de vente (€) *</label><input id="p-prix" inputmode="decimal" required></div>
+    </div>
+    <div class="err" id="pErr"></div>
+    <div class="row"><button type="button" class="btn ghost" id="pCancel">Annuler</button><button class="btn" type="submit" id="pSave">Enregistrer</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>

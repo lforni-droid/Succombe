@@ -3,20 +3,25 @@
 const {$,esc,addDays,today,eur,num,dayShort,dayLong,parse,STATUS,toast,macroBlock,makeClient}=window.SC;
 const CFG=window.SUCCOMBE_CONFIG||{};
 const sb=makeClient();
-const S={menus:{},selDate:null,cart:{date:null,items:{}},mine:[]};
+const S={menus:{},selDate:null,type:"plat",cart:{date:null,items:{}},mine:[],optinPrefilled:false};
 const LS_CLIENT="succombe-client",LS_TOKENS="succombe-commandes";
 const ls={get(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+const TYPE_LABEL={plat:"plat",gateau:"gâteau"};
 
 $("#f-creneau").innerHTML=(CFG.CRENEAUX||[]).map(c=>`<option>${esc(c)}</option>`).join("");
 
-const platsOf=d=>S.menus[d]||[];
+const itemsOf=d=>S.menus[d]||[];
 const days=()=>Array.from({length:CFG.JOURS_VISIBLES||7},(_,i)=>addDays(today(),i));
 
-async function loadPlats(){
+async function loadCarte(){
   const ds=days();
-  const {data,error}=await sb.from("plats").select("*").gte("jour",ds[0]).lte("jour",ds[ds.length-1]).order("ordre").order("created_at");
+  const {data,error}=await sb.from("programmation")
+    .select("jour,epuise,produit:produits(id,type,nom,description,proteines,lipides,glucides,kcal,prix,actif,ordre)")
+    .gte("jour",ds[0]).lte("jour",ds[ds.length-1]);
   if(error){$("#plats").innerHTML=`<div class="empty"><p>La carte n'a pas pu être chargée.</p><p class="small">Vérifiez votre connexion puis rechargez la page.</p></div>`;return;}
-  const m={};(data||[]).forEach(p=>{(m[p.jour]=m[p.jour]||[]).push(p);});
+  const m={};
+  (data||[]).forEach(r=>{if(!r.produit||!r.produit.actif)return;(m[r.jour]=m[r.jour]||[]).push(Object.assign({},r.produit,{epuise:r.epuise}));});
+  Object.values(m).forEach(l=>l.sort((a,b)=>a.ordre-b.ordre||a.nom.localeCompare(b.nom,"fr")));
   S.menus=m;render();
 }
 async function loadMine(){
@@ -27,18 +32,24 @@ async function loadMine(){
 }
 
 function pickDay(d){
-  if(S.cart.date&&S.cart.date!==d&&Object.keys(S.cart.items).length){toast("Panier vidé : un jour par commande");}
-  S.selDate=d;if(S.cart.date!==d)S.cart={date:d,items:{}};render();
+  if(S.cart.date&&S.cart.date!==d&&Object.keys(S.cart.items).length)toast("Panier vidé : un jour de livraison par commande");
+  S.selDate=d;render();
 }
 function render(){
-  const ds=days();const avail=d=>platsOf(d).some(p=>!p.epuise);
+  const ds=days();const avail=d=>itemsOf(d).some(p=>!p.epuise);
   if(!S.selDate||!ds.includes(S.selDate))S.selDate=ds.find(avail)||ds[0];
   if(S.cart.date!==S.selDate)S.cart={date:S.selDate,items:{}};
   $("#days").innerHTML=ds.map(d=>{const has=avail(d);return `<button type="button" class="day" data-d="${d}" aria-pressed="${d===S.selDate}" ${has?"":"disabled"}><span>${d===today()?"auj.":esc(dayShort(d))}</span><b>${parse(d).getDate()}</b>${has?'<i class="dot"></i>':""}</button>`;}).join("");
-  $("#dayTitle").textContent=S.selDate===today()?"La carte du jour":"La carte du "+dayLong(S.selDate);
-  const plats=platsOf(S.selDate);
-  $("#plats").innerHTML=!plats.length?`<div class="empty"><p>Aucun plat n'est encore publié pour ce jour.</p><p class="small">Choisissez un autre jour marqué d'un point.</p></div>`:
-    plats.map(p=>{const q=S.cart.items[p.id]||0;return `<article class="plat ${p.epuise?"off":""}">
+  $("#dayTitle").innerHTML=S.selDate===today()?"La carte <em>du jour</em>":"La carte <em>du "+esc(dayLong(S.selDate))+"</em>";
+  const all=itemsOf(S.selDate);
+  const nP=all.filter(p=>p.type==="plat").length,nG=all.filter(p=>p.type==="gateau").length;
+  if(S.type==="plat"&&!nP&&nG)S.type="gateau";
+  if(S.type==="gateau"&&!nG&&nP)S.type="plat";
+  $("#nPlat").textContent=nP?"("+nP+")":"";$("#nGateau").textContent=nG?"("+nG+")":"";
+  document.querySelectorAll("#ctabs button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.t===S.type)));
+  const list=all.filter(p=>p.type===S.type);
+  $("#plats").innerHTML=!list.length?`<div class="empty"><p>Aucun ${TYPE_LABEL[S.type]} n'est proposé ce jour-là.</p><p class="small">${all.length?"Regardez l'autre onglet, ou choisissez":"Choisissez"} un autre jour marqué d'un point.</p></div>`:
+    list.map(p=>{const q=S.cart.items[p.id]||0;return `<article class="plat ${p.epuise?"off":""}">
       <div class="plat-head"><div><h3 class="plat-name">${esc(p.nom)}</h3>${p.description?`<p class="desc">${esc(p.description)}</p>`:""}</div><div class="price">${eur(p.prix)}</div></div>
       ${macroBlock(p)}
       <div class="plat-foot">${p.epuise?'<span class="pill">Épuisé</span>':`<span class="small muted">${q?q+" dans le panier":"Quantité"}</span>
@@ -46,11 +57,11 @@ function render(){
     </article>`;}).join("");
   renderCart();
 }
-function cartLines(){const plats=platsOf(S.cart.date);return Object.entries(S.cart.items).map(([id,q])=>{const p=plats.find(x=>x.id===id);return p&&!p.epuise&&q>0?{p,q}:null;}).filter(Boolean);}
+function cartLines(){const items=itemsOf(S.cart.date);return Object.entries(S.cart.items).map(([id,q])=>{const p=items.find(x=>x.id===id);return p&&!p.epuise&&q>0?{p,q}:null;}).filter(Boolean);}
 function renderCart(){
   const lines=cartLines();const n=lines.reduce((a,l)=>a+l.q,0),tot=lines.reduce((a,l)=>a+l.q*num(l.p.prix),0);
   $("#cartbar").classList.toggle("show",n>0);
-  $("#cartCount").textContent=n+(n>1?" plats":" plat")+" · "+dayLong(S.cart.date||today());
+  $("#cartCount").textContent=n+(n>1?" articles":" article")+" · "+dayLong(S.cart.date||today());
   $("#cartTotal").textContent=eur(tot);
 }
 function renderMine(){
@@ -61,6 +72,7 @@ function renderMine(){
 }
 
 $("#days").addEventListener("click",e=>{const b=e.target.closest(".day");if(b&&!b.disabled)pickDay(b.dataset.d);});
+$("#ctabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.type=b.dataset.t;render();});
 $("#plats").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;const id=b.dataset.id;
   const q=Math.max(0,Math.min(20,(S.cart.items[id]||0)+Number(b.dataset.step)));if(q)S.cart.items[id]=q;else delete S.cart.items[id];render();});
 
@@ -69,33 +81,45 @@ $("#openOrder").addEventListener("click",()=>{
   const tot=lines.reduce((a,l)=>a+l.q*num(l.p.prix),0);
   $("#recap").innerHTML=`<div><span class="muted">${esc(dayLong(S.cart.date))}</span></div>`+lines.map(l=>`<div><span>${l.q} × ${esc(l.p.nom)}</span><span>${eur(l.q*num(l.p.prix))}</span></div>`).join("")+`<div class="tot"><span>Total</span><span>${eur(tot)}</span></div>`;
   const c=ls.get(LS_CLIENT,{});["prenom","nom","tel","email","adresse","cp","ville","creneau"].forEach(k=>{if(c[k])$("#f-"+k).value=c[k];});
+  S.optinPrefilled=c.optin===true;$("#f-optin").checked=S.optinPrefilled;
   $("#orderErr").textContent="";$("#orderDlg").showModal();
 });
 $("#cancelOrder").addEventListener("click",()=>$("#orderDlg").close());
 $("#orderForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const f=Object.fromEntries([...new FormData(e.target).entries()].map(([k,v])=>[k,String(v).trim()]));
+  const optin=$("#f-optin").checked;
   const miss=["prenom","nom","tel","adresse","cp","ville"].filter(k=>!f[k]);
   if(miss.length){$("#orderErr").textContent="Renseignez les champs marqués d'une étoile.";$("#f-"+miss[0]).focus();return;}
+  if(optin&&!f.email){$("#orderErr").textContent="Indiquez votre e-mail pour recevoir nos offres de fin d'année.";$("#f-email").focus();return;}
   const lines=cartLines();if(!lines.length){$("#orderDlg").close();return;}
   const btn=$("#sendOrder");btn.disabled=true;$("#orderErr").textContent="";
   const {data,error}=await sb.rpc("passer_commande",{
     p_jour:S.cart.date,p_creneau:f.creneau,p_note:f.note,
     p_client:{prenom:f.prenom,nom:f.nom,tel:f.tel,email:f.email,adresse:f.adresse,cp:f.cp,ville:f.ville},
-    p_items:lines.map(l=>({plat_id:l.p.id,qty:l.q}))});
+    p_items:lines.map(l=>({produit_id:l.p.id,qty:l.q})),
+    p_optin:optin?true:(S.optinPrefilled?false:null)});
   btn.disabled=false;
-  if(error){$("#orderErr").textContent=(error.message&&/[a-zé]{3}/i.test(error.message)&&error.message.length<120)?error.message:"La commande n'est pas partie. Vérifiez votre connexion et réessayez.";loadPlats();return;}
+  if(error){
+    const m=error.message||"";
+    $("#orderErr").textContent=/^[A-ZÉ][^\n]{5,110}\.$/.test(m)&&!/[a-z]_[a-z]/.test(m)?m:"La commande n'est pas partie. Vérifiez votre connexion et réessayez.";
+    loadCarte();return;
+  }
   const tokens=ls.get(LS_TOKENS,[]);tokens.unshift(data.token);ls.set(LS_TOKENS,tokens.slice(0,30));
-  ls.set(LS_CLIENT,{prenom:f.prenom,nom:f.nom,tel:f.tel,email:f.email,adresse:f.adresse,cp:f.cp,ville:f.ville,creneau:f.creneau});
+  ls.set(LS_CLIENT,{prenom:f.prenom,nom:f.nom,tel:f.tel,email:f.email,adresse:f.adresse,cp:f.cp,ville:f.ville,creneau:f.creneau,optin:optin});
   S.cart={date:S.selDate,items:{}};$("#f-note").value="";$("#orderDlg").close();
   toast("Commande envoyée");render();await loadMine();$("#mineWrap").scrollIntoView({behavior:"smooth"});
 });
 
 if(!sb){$("#plats").innerHTML=`<div class="empty"><p>Configuration manquante.</p><p class="small">Renseignez l'URL et la clé Supabase dans config.js.</p></div>`;}
 else{
-  loadPlats();loadMine();
-  sb.channel("carte").on("postgres_changes",{event:"*",schema:"public",table:"plats"},()=>loadPlats()).subscribe();
+  loadCarte();loadMine();
+  let t;const reload=()=>{clearTimeout(t);t=setTimeout(loadCarte,300);};
+  sb.channel("carte")
+    .on("postgres_changes",{event:"*",schema:"public",table:"programmation"},reload)
+    .on("postgres_changes",{event:"*",schema:"public",table:"produits"},reload)
+    .subscribe();
   setInterval(loadMine,30000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadPlats();loadMine();}});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadCarte();loadMine();}});
 }
 })();
